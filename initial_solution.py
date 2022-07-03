@@ -42,6 +42,7 @@ number_of_teams = 6
 number_of_weeks = int(((2*number_of_teams) - 2)/2)
 array_cost = np.zeros(number_of_teams)
 backup = []
+cost_matrix = np.zeros((number_of_teams,2*number_of_weeks))
 random.shuffle(matches_list)
 
 def heuristic_solution(all_matches_list: list, number_of_weeks: int, number_of_teams: int):
@@ -94,23 +95,30 @@ def heuristic_solution(all_matches_list: list, number_of_weeks: int, number_of_t
     schedule = schedule.T
     return(schedule)
 
-def calculate_sequence_matches_penalty(heuristic_schedule: np.array):
-    for team in range(heuristic_schedule.shape[0]):
+def add_second_tournament_round(heuristic_schedule: np.array):
+    second_round = -1*heuristic_schedule
+    full_heuristic_schedule = np.concatenate((heuristic_schedule, second_round), axis=1)
+    return full_heuristic_schedule
+
+def calculate_sequence_matches_penalty(hs: np.array):
+    for team in range(hs.shape[0]):
         dist = 0
         origin_loc = 'home'
         origin_loc_index = team
-        for d1 in range(heuristic_schedule.shape[1]):
-            if heuristic_schedule[team][d1]>0:
+        for d1 in range(hs.shape[1]):
+            if hs[team][d1]>0:
                 next_loc = 'home'
                 if origin_loc != next_loc:
                     dist += matrix_cost[origin_loc_index][team]
+                    cost_matrix[team][d1] = matrix_cost[origin_loc_index][team]
                     origin_loc_index = team
                     origin_loc = next_loc
-            elif heuristic_schedule[team][d1] < 0:
+            elif hs[team][d1] < 0:
                 next_loc = 'away'
                 if (origin_loc != next_loc) or (origin_loc == next_loc == 'away'):
-                    dist += matrix_cost[origin_loc_index][int(abs(heuristic_schedule[team][d1]))-1]
-                    origin_loc_index = int(abs(heuristic_schedule[team][d1]))-1
+                    dist += matrix_cost[origin_loc_index][int(abs(hs[team][d1]))-1]
+                    cost_matrix[team][d1] = matrix_cost[origin_loc_index][int(abs(hs[team][d1]))-1]
+                    origin_loc_index = int(abs(hs[team][d1]))-1
                     origin_loc = next_loc
         array_cost[team] = dist
 
@@ -125,19 +133,87 @@ def calculate_sequence_matches_penalty(heuristic_schedule: np.array):
         my_list = home_away_table[team_index].tolist()
         rep_home += len([[-1,-1,-1] for index in range(len(my_list)) if my_list[index : index + len([-1,-1,-1])] == [-1,-1,-1]])
         rep_home += len([[1,1,1] for index in range(len(my_list)) if my_list[index : index + len([1,1,1])] == [1,1,1]])
-    return rep_home
+    return rep_home, array_cost
 
-heuristic_schedule = heuristic_solution(all_matches_list = matches_list,number_of_teams=number_of_teams, number_of_weeks=number_of_weeks)
-print(f'Solution Example:\n{heuristic_schedule}')
-seq_penalty = calculate_sequence_matches_penalty(heuristic_schedule=heuristic_schedule)
+def pick_home_away_teams(costs_: np.array, hs : np.array):
+    round1 = costs_[:,:number_of_weeks]
+    round2 = costs_[:,number_of_weeks:]
+    matches_costs = round1 + round2
+
+    max_cost = np.unravel_index(np.argmax(matches_costs, axis=None), matches_costs.shape)
+    team_home_index = max_cost[0]
+    week_round1 = max_cost[1]
+    week_round2 = week_round1 + number_of_weeks
+    
+    team_away_index = int(abs(hs[team_home_index][week_round1]) - 1)
+    team_home = team_home_index + 1
+    team_away = team_away_index + 1
+
+    return matches_costs, team_home, team_home_index, team_away, team_away_index, week_round1, week_round2
 
 def evaluation_function(cost_array: list, seq_penalty: int):
-    fs = sum(cost_array) + 1000*seq_penalty
+    fs = sum(cost_array)# + 1000*seq_penalty
     return fs
 
-fs = evaluation_function(cost_array=array_cost,seq_penalty=seq_penalty)
+def vnd_swap_homes(hs_: np.array, home_index, away_index, w1, w2):
+    '''precisa de uma função anterior para decidir o team_home e away para trocar, encontrar rodada que se encontram no primeiro e segundo turno, fazer a troca'''
+    #print(f'home_index: {home_index}\naway_index: {away_index}\nweek of round 1: {w1}\nweek of round 2: {w2}\n')
+    hs = hs_.copy()
+    hs[home_index][w1], hs[home_index][w2] = hs[home_index][w2], hs[home_index][w1]
+    hs[away_index][w1], hs[away_index][w2] = hs[away_index][w2], hs[away_index][w1]
+    return hs
 
-print(seq_penalty)
-print(array_cost)
-print(fs)
-np.savetxt(f'./solutions/heuristic_schedule_{number_of_teams}_{int(sum(array_cost))}.csv', heuristic_schedule, delimiter=",")
+def vnd_swap_rounds(hs_ : np.array, cm_: np.array, nw):
+    hs = hs_.copy()
+    w1 = cm_[:,:nw].sum(axis=0).argmax()
+    w2 = cm_[:,:nw].sum(axis=0).argsort()[-2]
+    hs[:,w1], hs[:,w2] = hs[:,w2], hs[:,w1]
+    return hs
+
+def vnd_explorer(fhs_: np.array):
+    best_fhs = fhs_
+    best_seq_penalty, best_array_cost = calculate_sequence_matches_penalty(hs=best_fhs)
+    best_fs = evaluation_function(cost_array=best_array_cost, seq_penalty=best_seq_penalty)
+    print(f'Solution 01:\n{best_fhs}')
+    print(best_seq_penalty)
+    print(best_array_cost)
+    print(best_fs)
+
+    for i in range(1000):
+        matches_cost, team_home, team_home_index, team_away, team_away_index, week_r1, week_r2 = pick_home_away_teams(cost_matrix, hs=best_fhs)
+        fhs_swaped_homes = vnd_swap_homes(hs_= best_fhs, home_index = team_home_index, away_index = team_away_index, w1 = week_r1, w2=week_r2)
+        seq_penalty, array_cost = calculate_sequence_matches_penalty(hs=fhs_swaped_homes)
+        fs = evaluation_function(cost_array=array_cost, seq_penalty=seq_penalty)
+        if fs<best_fs:
+            print(f'Found a better solution swapping homes: From {best_fs} to {fs}')
+            best_fs = fs
+            best_fhs = fhs_swaped_homes
+            best_seq_penalty = seq_penalty
+            best_array_cost = array_cost
+        i += 1
+    
+    for i in range(1000):
+        fhs_swaped_rounds = vnd_swap_rounds(hs_ = best_fhs, cm_ = cost_matrix, nw=number_of_weeks)
+        seq_penalty = calculate_sequence_matches_penalty(hs=fhs_swaped_rounds)
+        fs = evaluation_function(cost_array=array_cost, seq_penalty=seq_penalty)
+        if fs<best_fs:
+            print(f'Found a better solution swapping rounds: From {best_fs} to {fs}')
+            best_fs = fs
+            best_fhs = fhs_swaped_homes
+            best_seq_penalty = seq_penalty
+            best_array_cost = array_cost
+        i += 1
+    return best_fs, best_fhs, best_seq_penalty, best_array_cost
+
+#### First solution
+heuristic_schedule = heuristic_solution(all_matches_list = matches_list,number_of_teams=number_of_teams, number_of_weeks=number_of_weeks)
+full_heuristic_schedule = add_second_tournament_round(heuristic_schedule=heuristic_schedule)
+
+best_fs, best_fhs, best_seq_penalty, best_array_cost = vnd_explorer(fhs_ = full_heuristic_schedule)
+
+print(f'Final Solution:\n{best_fhs}')
+print(best_seq_penalty)
+print(best_array_cost)
+print(best_fs)
+
+#np.savetxt(f'./solutions/heuristic_schedule_teams-{number_of_teams}_seqpenalty-{seq_penalty}_cost-{int(fs)}.csv', heuristic_schedule, delimiter=",")
