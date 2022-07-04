@@ -133,7 +133,7 @@ def calculate_sequence_matches_penalty(hs: np.array):
         my_list = home_away_table[team_index].tolist()
         rep_home += len([[-1,-1,-1] for index in range(len(my_list)) if my_list[index : index + len([-1,-1,-1])] == [-1,-1,-1]])
         rep_home += len([[1,1,1] for index in range(len(my_list)) if my_list[index : index + len([1,1,1])] == [1,1,1]])
-    return rep_home, array_cost
+    return rep_home, array_cost, cost_matrix
 
 def pick_home_away_teams(costs_: np.array, hs : np.array):
     round1 = costs_[:,:number_of_weeks]
@@ -152,7 +152,7 @@ def pick_home_away_teams(costs_: np.array, hs : np.array):
     return matches_costs, team_home, team_home_index, team_away, team_away_index, week_round1, week_round2
 
 def evaluation_function(cost_array: list, seq_penalty: int):
-    fs = sum(cost_array)# + 1000*seq_penalty
+    fs = sum(cost_array) + 5000*seq_penalty
     return fs
 
 def vnd_swap_homes(hs_: np.array, home_index, away_index, w1, w2):
@@ -172,17 +172,17 @@ def vnd_swap_rounds(hs_ : np.array, cm_: np.array, nw):
 
 def vnd_explorer(fhs_: np.array):
     best_fhs = fhs_
-    best_seq_penalty, best_array_cost = calculate_sequence_matches_penalty(hs=best_fhs)
+    best_seq_penalty, best_array_cost, best_cost_matrix = calculate_sequence_matches_penalty(hs=best_fhs)
     best_fs = evaluation_function(cost_array=best_array_cost, seq_penalty=best_seq_penalty)
-    print(f'Solution 01:\n{best_fhs}')
-    print(best_seq_penalty)
-    print(best_array_cost)
-    print(best_fs)
+    #print(f'Solution 01:\n{best_fhs}')
+    #print(best_seq_penalty)
+    #print(best_array_cost)
+    #print(best_fs)
 
-    for i in range(1000):
-        matches_cost, team_home, team_home_index, team_away, team_away_index, week_r1, week_r2 = pick_home_away_teams(cost_matrix, hs=best_fhs)
+    for i in range(100):
+        matches_cost, team_home, team_home_index, team_away, team_away_index, week_r1, week_r2 = pick_home_away_teams(costs_= best_cost_matrix, hs=best_fhs)
         fhs_swaped_homes = vnd_swap_homes(hs_= best_fhs, home_index = team_home_index, away_index = team_away_index, w1 = week_r1, w2=week_r2)
-        seq_penalty, array_cost = calculate_sequence_matches_penalty(hs=fhs_swaped_homes)
+        seq_penalty, array_cost, cost_matrix = calculate_sequence_matches_penalty(hs=fhs_swaped_homes)
         fs = evaluation_function(cost_array=array_cost, seq_penalty=seq_penalty)
         if fs<best_fs:
             print(f'Found a better solution swapping homes: From {best_fs} to {fs}')
@@ -190,11 +190,20 @@ def vnd_explorer(fhs_: np.array):
             best_fhs = fhs_swaped_homes
             best_seq_penalty = seq_penalty
             best_array_cost = array_cost
+            best_cost_matrix = cost_matrix
+        else:
+            week_r1 = random.randint(0,number_of_weeks-1)
+            team_home_index = random.randint(0,number_of_teams-1)
+            week_r2 = week_r1 + number_of_weeks
+            team_away_index = int(abs(best_fhs[team_home_index, week_r1])) - 1
+            fhs_swaped_homes = vnd_swap_homes(hs_= best_fhs, home_index = team_home_index, away_index = team_away_index, w1 = week_r1, w2=week_r2)
+            seq_penalty, array_cost, cost_matrix = calculate_sequence_matches_penalty(hs=fhs_swaped_homes)
+            fs = evaluation_function(cost_array=array_cost, seq_penalty=seq_penalty)
         i += 1
     
-    for i in range(1000):
-        fhs_swaped_rounds = vnd_swap_rounds(hs_ = best_fhs, cm_ = cost_matrix, nw=number_of_weeks)
-        seq_penalty = calculate_sequence_matches_penalty(hs=fhs_swaped_rounds)
+    for i in range(100):
+        fhs_swaped_rounds = vnd_swap_rounds(hs_= best_fhs, cm_= cost_matrix, nw=number_of_weeks)
+        seq_penalty, array_cost, cost_matrix = calculate_sequence_matches_penalty(hs=fhs_swaped_rounds)
         fs = evaluation_function(cost_array=array_cost, seq_penalty=seq_penalty)
         if fs<best_fs:
             print(f'Found a better solution swapping rounds: From {best_fs} to {fs}')
@@ -202,18 +211,55 @@ def vnd_explorer(fhs_: np.array):
             best_fhs = fhs_swaped_homes
             best_seq_penalty = seq_penalty
             best_array_cost = array_cost
+            best_cost_matrix = cost_matrix
         i += 1
-    return best_fs, best_fhs, best_seq_penalty, best_array_cost
+    return best_fs, best_fhs, best_seq_penalty, best_array_cost, best_cost_matrix
+
+def iterated_local_search(fhs_: np.array, n_restarts: int):
+    #s0 <- initial_solution
+    initial_solution = fhs_ 
+    initial_seq_penalty, initial_array_cost, initial_cost_matrix = calculate_sequence_matches_penalty(hs=initial_solution)
+    initial_fs = evaluation_function(cost_array=initial_array_cost, seq_penalty=initial_seq_penalty)
+    #s <- local_search(s0)
+    best_fs, best_fhs, best_seq_penalty, best_array_cost, best_cost_matrix = vnd_explorer(fhs_ = initial_solution)
+    #iter <- 0
+    i = 0
+    for i in range(n_restarts):
+        i += 1 #i <- i + 1
+        pert_fhs = vnd_swap_homes(hs_= best_fhs, home_index= random.randint(0,number_of_teams-1), away_index= random.randint(0,number_of_teams-1), 
+                                    w1 = random.randint(0,number_of_weeks-1), w2 = random.randint(0,number_of_weeks-1)) #s’ <- perturbation(s, historics)
+        next_fs, next_fhs, next_seq_penalty, next_array_cost, next_cost_matrix = vnd_explorer(fhs_ = pert_fhs) #s’’ <- local_search(s’)
+        if next_fs < best_fs: #s <- acceptance_criteria(s, s’’)
+            best_fs = next_fs
+            best_fhs = next_fhs
+            best_seq_penalty = next_seq_penalty
+            best_array_cost = next_array_cost
+            best_cost_matrix = next_cost_matrix
+    return best_fs, best_fhs, best_seq_penalty, best_array_cost, best_cost_matrix
+
 
 #### First solution
 heuristic_schedule = heuristic_solution(all_matches_list = matches_list,number_of_teams=number_of_teams, number_of_weeks=number_of_weeks)
 full_heuristic_schedule = add_second_tournament_round(heuristic_schedule=heuristic_schedule)
+init_seq_penalty, init_array_cost, init_cost_matrix = calculate_sequence_matches_penalty(hs=full_heuristic_schedule)
+best_fs = evaluation_function(cost_array=init_array_cost, seq_penalty=init_seq_penalty)
+print(f'Initial Solution:\n{full_heuristic_schedule}')
+print(init_seq_penalty)
+print(init_array_cost)
+print(best_fs)
 
-best_fs, best_fhs, best_seq_penalty, best_array_cost = vnd_explorer(fhs_ = full_heuristic_schedule)
+best_fs, best_fhs, best_seq_penalty, best_array_cost, best_cost_matrix = vnd_explorer(fhs_ = full_heuristic_schedule)
 
-print(f'Final Solution:\n{best_fhs}')
+print(f'Final Solution (Heuristic):\n{best_fhs}')
 print(best_seq_penalty)
 print(best_array_cost)
 print(best_fs)
+
+ils_fs, ils_fhs, ils_seq_penalty, ils_array_cost, ils_cost_matrix = iterated_local_search(fhs_ = full_heuristic_schedule, n_restarts = 100)
+
+print(f'Final Solution (ILS):\n{ils_fhs}')
+print(ils_seq_penalty)
+print(ils_array_cost)
+print(ils_fs)
 
 #np.savetxt(f'./solutions/heuristic_schedule_teams-{number_of_teams}_seqpenalty-{seq_penalty}_cost-{int(fs)}.csv', heuristic_schedule, delimiter=",")
