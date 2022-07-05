@@ -126,16 +126,47 @@ $$
 fs = \sum_{i=1}^{n} c_{i}*(1 + \frac{3 * seq\\_penalty}{2} + 4 * (rep\\_penalty + mult\\_penalty))
 $$
 
-### F5. Movimentos de vizinhança
+### F6. Movimentos de vizinhança
 
 Por fim, na heurística desenvolvida, a função *vnd_explorer* busca em uma iteração de 100 passos uma solução menos custosa $fs'$ através de dois tipos de movimentações: (i) *vnd_swap_homes*: alternando a ordem dos confrontos de casa e fora entre dois times (Tabela 2) e (ii) *vnd_swap_rounds*: alternando duas rodadas da tabela (Tabela 3).
 
 Tabela 02. Exemplo de movimentação de vizinhança utilizando *swap_homes*.
 ![image](https://user-images.githubusercontent.com/27898822/177353110-21a4db6a-a9d7-4948-8e44-252c5b17afe5.png)
 
-Tabela 03. Exemplo de movimentação de vizinhança utilizando *swap_rounds*
+Tabela 03. Exemplo de movimentação de vizinhança utilizando *swap_rounds*.
 ![image](https://user-images.githubusercontent.com/27898822/177353306-d9cd64f3-eb35-4b60-8530-adab67f3b25a.png)
 
-
-
 ## Meta-heuristíca aplicada: Iterated Local Search
+
+Foi aplicada a meta-heuristica Iterared Local Search (ILS) no problema a fim de comparar os resultados com a heurística previamente descrita. Abaixo o pseudocódigo do ILS:
+
+```
+Algoritmo ILS
+  s0 <- SolucaoInicial
+  s <- BuscaLocal(s0)
+  iter <- 0; {Contador do número de iterações}
+  MelhorIter <- Iter; {Iteração em que ocorreu melhora}
+  enquanto (iter – MelhorIter < ILSmax)
+    iter <- iter + 1
+    s’ <- perturbação(s, histórico)
+    s” <- BuscaLocal(s’)
+    se ( f(s”) < f(s) ) faça
+      s <- s”
+    fim-se
+  fim-enquanto
+retorne s
+```
+
+### F7. iterated_local_search
+
+A função *iterated_local_search*, a partir da matriz de solução inicial *full_heuristic_schedule* gera uma perturbação na solução utilizando a movimentação de vizinhança *swap_homes* e então faz uma busca local através da função *vnd_explorer* a fim de encontrar alguma melhoria nessa busca local.
+
+## Resultados computacionais
+
+A partir de 10 execuções, foram geradas as médias e desvio-padrão de tempo computacional e dos valores da função de custo, bem como o melhor resultado da heurística e meta-heurística.
+
+Tabela 06. Média e desvio-padrão da função de custo e tempo computacional das soluções para $n$=10.
+|$n$|Método|$fs$ ($\mu$)|$fs$ ($\sigma$)|$\mu_{tempo}$|$\sigma_{tempo}$|
+|---|---|---|---|---|---|
+|10|Heurística|$9,5788 \times 10^{6}$|$1,8238 \times 10^{6}$|$0,1974$|$0,0109$|
+|10|ILS|$5,3740 \times 10^{6}$|$2,3166 \times 10^{6}$|$85,6560$|$1,7109$|
