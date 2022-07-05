@@ -128,7 +128,13 @@ $$
 
 ### F5. Movimentos de vizinhança
 
-Por fim, na heurística desenvolvida, 
+Por fim, na heurística desenvolvida, a função *vnd_explorer* busca em uma iteração de 100 passos uma solução menos custosa $fs'$ através de dois tipos de movimentações: (i) *vnd_swap_homes*: alternando a ordem dos confrontos de casa e fora entre dois times (Tabela 2) e (ii) *vnd_swap_rounds*: alternando duas rodadas da tabela (Tabela 3).
+
+Tabela 02. Exemplo de movimentação de vizinhança utilizando *swap_homes*.
+![image](https://user-images.githubusercontent.com/27898822/177353110-21a4db6a-a9d7-4948-8e44-252c5b17afe5.png)
+
+Tabela 03. Exemplo de movimentação de vizinhança utilizando *swap_rounds*
+![image](https://user-images.githubusercontent.com/27898822/177353306-d9cd64f3-eb35-4b60-8530-adab67f3b25a.png)
 
 
 
