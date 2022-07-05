@@ -171,4 +171,4 @@ Tabela 04. Média e desvio-padrão da função de custo e tempo computacional da
 |10|Heurística|$9,5788 \times 10^{6}$|$1,8238 \times 10^{6}$|$0,1974$|$0,0109$|
 |10|ILS|$5,3740 \times 10^{6}$|$2,3166 \times 10^{6}$|$85,6560$|$1,7109$|
 
-O melhor resultado da função de custo $fs$ encontrado através da Heurística foi $5,3196 \times 10^{7}$, enquanto ao aplicar a meta-heurística ILS o melhor resultado foi $2,8394 \times 10^{7}$.
+O melhor resultado da função de custo $fs$ encontrado através da Heurística foi $5,3196 \times 10^{6}$, enquanto ao aplicar a meta-heurística ILS o melhor resultado foi $2,8394 \times 10^{6}$.
